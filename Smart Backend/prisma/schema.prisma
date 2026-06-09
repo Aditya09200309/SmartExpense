@@ -1,0 +1,175 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum Role {
+  ADMIN
+  MEMBER
+}
+
+enum SplitType {
+  EQUAL
+  EXACT
+  PERCENTAGE
+}
+
+// ─── Models ───────────────────────────────────────────────────────────────────
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  optOutNudges Boolean  @default(false)
+
+  groupMemberships    GroupMember[]
+  createdGroups       Group[]
+  paidExpenses        Expense[]
+  expenseSplits       ExpenseSplit[]
+  sentSettlements     Settlement[]  @relation("SettlementPayer")
+  receivedSettlements Settlement[]  @relation("SettlementReceiver")
+}
+
+model Group {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String
+  baseCurrency      String  @default("USD")
+  designatedPayerId String?
+
+  createdBy   User          @relation(fields: [createdById], references: [id])
+  members     GroupMember[]
+  expenses    Expense[]
+  settlements Settlement[]
+}
+
+model GroupMember {
+  id       String   @id @default(uuid())
+  userId   String
+  groupId  String
+  role     Role     @default(MEMBER)
+  joinedAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id])
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, groupId])
+}
+
+model Expense {
+  id          String    @id @default(uuid())
+  groupId     String
+  paidById    String
+  amount      Decimal   @db.Decimal(10, 2)
+  description String
+  category    String?
+  splitType   SplitType @default(EQUAL)
+  date        DateTime  @default(now())
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  currency    String    @default("USD")
+  exchangeRate Decimal  @default(1.0) @db.Decimal(10, 4)
+
+  group  Group          @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  paidBy User           @relation(fields: [paidById], references: [id])
+  splits ExpenseSplit[]
+}
+
+model ExpenseSplit {
+  id        String  @id @default(uuid())
+  expenseId String
+  userId    String
+  amount    Decimal @db.Decimal(10, 2)
+  isPaid    Boolean @default(false)
+
+  expense Expense @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@unique([expenseId, userId])
+}
+
+model Settlement {
+  id         String   @id @default(uuid())
+  groupId    String
+  payerId    String
+  receiverId String
+  amount     Decimal  @db.Decimal(10, 2)
+  note       String?
+  settledAt  DateTime @default(now())
+
+  group    Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  payer    User  @relation("SettlementPayer",    fields: [payerId],    references: [id])
+  receiver User  @relation("SettlementReceiver", fields: [receiverId], references: [id])
+}
+
+// ─── Intelligence ─────────────────────────────────────────────────────────────
+
+model Intel_UserBehavior {
+  userId               String   @id
+  trustScore           Float    // 0-100 scale
+  avgTimeToSettleHours Int      // Explainable component
+  totalDelayedPayments Int      // Explainable component
+  lastCalculatedAt     DateTime @default(now())
+}
+
+model Intel_GroupHealth {
+  groupId              String   @id
+  healthScore          Float    // 0-100 scale
+  fairnessIndex        Float    // 0.0 (perfectly fair) to 1.0 (highly asymmetric)
+  staleDebtVolume      Decimal  @db.Decimal(10, 2)
+  lastCalculatedAt     DateTime @default(now())
+}
+
+model Intel_DebtInsight {
+  id                   String   @id @default(uuid())
+  groupId              String
+  debtorId             String
+  creditorId           String
+  daysOld              Int
+  isStale              Boolean  @default(false)
+  updatedAt            DateTime @updatedAt
+  
+  @@unique([groupId, debtorId, creditorId])
+}
+
+model Intel_UserPersonality {
+  userId               String   @id
+  dominantTrait        String   // e.g., "LIGHTNING_SETTLER", "ANCHOR_CONTRIBUTOR"
+  traitConfidence      Float    // 0.0 to 1.0 confidence based on sample size
+  lastEvaluatedAt      DateTime @default(now())
+}
+
+model Intel_LongitudinalStats {
+  id                   String   @id @default(uuid())
+  userId               String
+  periodStart          DateTime // e.g., 2026-05-01
+  periodEnd            DateTime
+  totalContribution    Decimal  @db.Decimal(10, 2)
+  avgTimeToSettle      Int
+}
+
+model Intel_SocialEquilibrium {
+  id                   String   @id @default(uuid())
+  groupId              String
+  userId               String
+  rollingLiquidityBurden Decimal @db.Decimal(10, 2) @default(0) // Total $ out of pocket in last 30d
+  rollingInitiationCount Int     @default(0)                    // Number of expenses created in last 30d
+  lastUpdated          DateTime  @default(now())
+  
+  @@unique([groupId, userId])
+}
