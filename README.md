@@ -138,9 +138,3 @@ SmartExpense
 SmartExpense is actively evolving into an intelligent financial coordination platform for groups and shared spending environments.
 
 ---
-
-## Author
-
-**Aditya Telkapalli**
-
-GitHub: https://github.com/Aditya09200309
