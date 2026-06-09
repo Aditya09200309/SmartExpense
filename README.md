@@ -4,8 +4,11 @@ SmartExpense is a full-stack expense sharing and settlement platform designed fo
 
 Unlike traditional expense trackers that only record expenses and balances, SmartExpense helps users identify the most effective settlement actions through debt optimization, cross-group balance analysis, and intelligent financial insights.
 
----
+## Dashboard Preview
 
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/e5e873e3-faac-4123-b10c-ef8ba6ad02f1" />
+
+---
 ## Key Features
 
 ### Expense Management
